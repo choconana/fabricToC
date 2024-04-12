@@ -6,6 +6,9 @@ import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
 import org.bouncycastle.jcajce.provider.asymmetric.util.EC5Util;
 import org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil;
+import org.bouncycastle.math.ec.ECFieldElement;
+import org.bouncycastle.math.ec.custom.sec.SecP256R1Curve;
+import org.bouncycastle.math.ec.custom.sec.SecP256R1Point;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric.sdk.security.CryptoSuiteFactory;
 
@@ -14,6 +17,7 @@ import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.*;
+import java.util.Arrays;
 import java.util.Base64;
 
 public class KeyConvertor {
@@ -120,6 +124,46 @@ public class KeyConvertor {
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, prvKeyBytes), ecParameters);
         KeyFactory kf = KeyFactory.getInstance("EC");
         return kf.generatePrivate(privateSpec);
+    }
+
+    public static PublicKey getPubKey(byte[] pubKeyBytes) throws Exception {
+
+        PublicKey publicKey = null;
+
+        switch (pubKeyBytes.length) {
+            case 65:
+                // 未压缩
+                return publicKey;
+            case 33:
+                // 压缩处理过
+                byte format = pubKeyBytes[0];
+                byte[] x = Arrays.copyOfRange(pubKeyBytes, 1, pubKeyBytes.length);
+                boolean isOddY = format == 0x03;
+                publicKey = decompressY(x, isOddY);
+        }
+        return publicKey;
+    }
+
+    private static PublicKey decompressY(byte[] x, boolean isOddY) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
+        KeyFactory kf = KeyFactory.getInstance("EC");
+
+        // y^2 = x^3 + ax + b => y = +-sqrt(x^3 + ax + b)
+        SecP256R1Curve curve = new SecP256R1Curve();
+        ECFieldElement A = curve.getA();
+        ECFieldElement B = curve.getB();
+        ECFieldElement X = curve.fromBigInteger(new BigInteger(1, x));
+        ECFieldElement Y = X.square().multiply(X).add(A.multiply(X)).add(B).sqrt();
+        org.bouncycastle.math.ec.ECPoint P = new SecP256R1Point(curve, X, Y);
+        P.normalize();
+        if (P.getAffineYCoord().testBitZero() != isOddY) {
+            P = P.negate();
+        }
+        ECPoint pubPoint = EC5Util.convertPoint(P);
+        ECPublicKeySpec pubSpec = new ECPublicKeySpec(pubPoint, ecParameters);
+        return kf.generatePublic(pubSpec);
     }
 
     public static byte[] getPubKeyBytesFromPrvKey(byte[] prvKey) throws Exception {
