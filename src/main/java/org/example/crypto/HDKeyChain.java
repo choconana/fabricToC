@@ -1,10 +1,13 @@
 package org.example.crypto;
 
+import cn.hutool.core.codec.Base58;
 import cn.hutool.core.util.ByteUtil;
 import cn.hutool.crypto.digest.HMac;
 import cn.hutool.crypto.digest.HmacAlgorithm;
 import lombok.Builder;
 import lombok.Data;
+import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.jcajce.provider.asymmetric.util.EC5Util;
 import org.bouncycastle.jcajce.provider.digest.RIPEMD160;
 import org.bouncycastle.jcajce.provider.digest.SHA256;
@@ -20,6 +23,7 @@ import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
+import java.util.zip.CRC32;
 
 public class HDKeyChain {
 
@@ -29,11 +33,53 @@ public class HDKeyChain {
 
     private static final int maxDepth = 255;
 
+    private static final int serializedKeyLen = 4 + 1 + 4 + 4 + 32 + 33;
+
     // BIP32 hierarchical deterministic extended key magics
     public static final byte[] HDPrivateKeyID = new BigInteger("0488ade4", 16).toByteArray(); // starts with xprv
     public static final byte[] HDPublicKeyID = new BigInteger("0488b21e", 16).toByteArray(); // starts with xpub
 
     public static void main(String[] args) throws Exception {
+//        testDerive();
+        testSerialize();
+    }
+
+    public static void testDerive() throws Exception {
+        byte[] seed = new byte[32];
+        SecureRandom random = JCAUtil.getSecureRandom();
+        random.nextBytes(seed);
+        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID, seed);
+        ExtendedKey rootPubKey = neuter(rootPrvKey);
+        KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
+        System.out.println(KeyChecker.checkKeyPair(keyPair));
+        System.out.println(rootPrvKey.serialize());
+        System.out.println(rootPubKey.serialize());
+
+        ExtendedKey childPrvKey = derive(1, rootPrvKey);
+        ExtendedKey childPubKey = derive(1, rootPubKey);
+        System.out.println(childPrvKey.serialize());
+        System.out.println(childPubKey.serialize());
+
+        KeyPair correctKeyPair = KeyConvertor.genByPrvKey(((ECPrivateKey) childPrvKey.getKey()).getS().toByteArray());
+        System.out.println(KeyChecker.checkKeyPair(correctKeyPair));
+
+        KeyPair childKeyPair = new KeyPair((PublicKey) childPubKey.getKey(), (PrivateKey) childPrvKey.getKey());
+        System.out.println(KeyChecker.checkKeyPair(childKeyPair));
+
+        for (int i = 0; i < 20; i++) {
+            System.out.println("=====================================");
+            ExtendedKey grandChildPrvKey = derive(i, childPrvKey);
+            ExtendedKey grandChildPubKey = derive(i, childPubKey);
+            System.out.println(grandChildPrvKey.serialize());
+            System.out.println(grandChildPubKey.serialize());
+            KeyPair grandChildKeyPair = new KeyPair((PublicKey) grandChildPubKey.getKey(), (PrivateKey) grandChildPrvKey.getKey());
+            System.out.println(i + ": " + KeyChecker.checkKeyPair(grandChildKeyPair));
+            childPrvKey = grandChildPrvKey;
+            childPubKey = grandChildPubKey;
+        }
+    }
+
+    public static void testSerialize() throws Exception {
         byte[] seed = new byte[32];
         SecureRandom random = JCAUtil.getSecureRandom();
         random.nextBytes(seed);
@@ -42,10 +88,20 @@ public class HDKeyChain {
         KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(keyPair));
 
+        String prvKeySerialize = rootPrvKey.serialize();
+        String pubKeySerialize = rootPubKey.serialize();
+        System.out.println(prvKeySerialize);
+        System.out.println(pubKeySerialize);
+
+        ExtendedKey prvKeyDeserialize = ExtendedKey.deserialize(prvKeySerialize);
+        ExtendedKey pubKeyDeserialize = ExtendedKey.deserialize(pubKeySerialize);
+        KeyPair keyPair1 = new KeyPair((PublicKey) pubKeyDeserialize.getKey(), (PrivateKey) prvKeyDeserialize.getKey());
+        System.out.println("deser:" + KeyChecker.checkKeyPair(keyPair1));
+
         ExtendedKey childPrvKey = derive(1, rootPrvKey);
         ExtendedKey childPubKey = derive(1, rootPubKey);
-        KeyPair correctKeyPair = KeyConvertor.genByPrvKey(((ECPrivateKey) childPrvKey.getKey()).getS().toByteArray());
-        System.out.println(KeyChecker.checkKeyPair(correctKeyPair));
+        System.out.println(childPrvKey.serialize());
+        System.out.println(childPubKey.serialize());
 
         KeyPair childKeyPair = new KeyPair((PublicKey) childPubKey.getKey(), (PrivateKey) childPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(childKeyPair));
@@ -53,10 +109,12 @@ public class HDKeyChain {
         for (int i = 0; i < 20; i++) {
             ExtendedKey grandChildPrvKey = derive(i, childPrvKey);
             ExtendedKey grandChildPubKey = derive(i, childPubKey);
-            KeyPair grandChildKeyPair = new KeyPair((PublicKey) grandChildPubKey.getKey(), (PrivateKey) grandChildPrvKey.getKey());
-            System.out.println(i + ": " + KeyChecker.checkKeyPair(grandChildKeyPair));
-            childPrvKey = grandChildPrvKey;
-            childPubKey = grandChildPubKey;
+            ExtendedKey grandSerPrvKey = ExtendedKey.deserialize(grandChildPrvKey.serialize());
+            ExtendedKey grandSerPubKey = ExtendedKey.deserialize(grandChildPubKey.serialize());
+            KeyPair grandChildKeyPair = new KeyPair((PublicKey) grandSerPubKey.getKey(), (PrivateKey) grandSerPrvKey.getKey());
+            System.out.println("deser" + i + ": " + KeyChecker.checkKeyPair(grandChildKeyPair));
+            childPrvKey = grandSerPrvKey;
+            childPubKey = grandSerPubKey;
         }
     }
 
@@ -113,7 +171,7 @@ public class HDKeyChain {
 
         boolean isChildHardened = index >= hardenedKeyStart;
         if (!extendedKey.isPrivate && isChildHardened) {
-            throw new SecurityException("cannot derive key from hardened public key");
+            throw new SecurityException("cannot derive a hardened key from a public key");
         }
 
         int keyLen = 33;
@@ -200,16 +258,21 @@ public class HDKeyChain {
 
     @Data
     @Builder
+    @ToString
     public static class ExtendedKey {
         // This will be the pubkey for extended pub keys
+        @ToString.Exclude
         private Key key;
 
         // This will only be set for extended priv keys
+        @ToString.Exclude
         private PublicKey extendedPubKey;
 
         // 33字节
+        @ToString.Exclude
         private byte[] keyBytes;
 
+        @ToString.Exclude
         private byte[] chaincode;
 
         private int depth;
@@ -218,6 +281,7 @@ public class HDKeyChain {
 
         private long childNum;
 
+        @ToString.Exclude 
         private byte[] version;
 
         private boolean isPrivate;
@@ -237,5 +301,87 @@ public class HDKeyChain {
             }
             return this;
         }
+
+        public String serialize() {
+            System.out.println(this);
+            StringBuilder binary = new StringBuilder()
+                    .append(ByteUtils.toBinary(version, 32))
+                    .append(ByteUtils.formatBinary(Integer.toBinaryString(depth), 8))
+                    .append(ByteUtils.toBinary(parentFP, 32))
+                    .append(ByteUtils.formatBinary(Long.toBinaryString(childNum), 32))
+                    .append(ByteUtils.toBinary(chaincode, 256))
+                    .append(ByteUtils.toBinary(keyBytes, 264));
+            CRC32 crc32 = new CRC32();
+            crc32.reset();
+            crc32.update(new BigInteger(binary.toString(), 2).toByteArray());
+            binary.append(ByteUtils.formatBinary(Long.toBinaryString(crc32.getValue()), 32));
+            return Base58.encode(new BigInteger(binary.toString(), 2).toByteArray());
+        }
+
+        public static ExtendedKey deserialize(String base58Key) throws Exception {
+
+            byte[] decoded = Base58.decode(base58Key);
+            if (decoded.length != serializedKeyLen + 4) {
+                throw new InvalidKeyException("the provided serialized extended key length is invalid");
+            }
+
+            byte[] payload = Arrays.copyOfRange(decoded, 0, decoded.length - 4);
+            byte[] checksum = Arrays.copyOfRange(decoded, decoded.length - 4, decoded.length);
+            CRC32 crc32 = new CRC32();
+            crc32.reset();
+            crc32.update(payload);
+            if (crc32.getValue() != new BigInteger(1, checksum).longValue()) {
+                throw new InvalidKeyException("bad extended key checksum");
+            }
+
+            int len = 0;
+            byte[] version = new byte[4];
+            System.arraycopy(decoded, len, version, 0, version.length);
+            len += version.length;
+
+            int depth = decoded[len] & 0xFF;
+            len++;
+
+            byte[] parentFP = new byte[4];
+            System.arraycopy(decoded, len, parentFP, 0, parentFP.length);
+            len += parentFP.length;
+
+            byte[] childNumBytes = new byte[4];
+            System.arraycopy(decoded, len, childNumBytes, 0, childNumBytes.length);
+            long childNum = new BigInteger(1, childNumBytes).longValue();
+            len += childNumBytes.length;
+
+            byte[] chaincode = new byte[32];
+            System.arraycopy(decoded, len, chaincode, 0, chaincode.length);
+            len += chaincode.length;
+
+            byte[] keyBytes = new byte[33];
+            System.arraycopy(decoded, len, keyBytes, 0, keyBytes.length);
+            len += keyBytes.length;
+
+            boolean isPrivate = keyBytes[0] == 0x00;
+
+            Key key;
+            if (isPrivate) {
+                key = KeyConvertor.getPrvKey(keyBytes);
+            } else {
+                key = KeyConvertor.getPubKey(keyBytes);
+            }
+
+            return ExtendedKey.builder()
+                    .version(version)
+                    .key(key)
+                    .keyBytes(keyBytes)
+                    .chaincode(chaincode)
+                    .parentFP(parentFP)
+                    .depth(depth)
+                    .childNum(childNum)
+                    .isPrivate(isPrivate)
+                    .build();
+        }
+    }
+
+    public String getDerivationPath() {
+        return "";
     }
 }
