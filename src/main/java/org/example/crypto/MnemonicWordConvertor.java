@@ -10,10 +10,7 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.SecureRandom;
+import java.security.*;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -86,8 +83,9 @@ public class MnemonicWordConvertor {
     public static void main(String[] args) throws Exception {
         String[] mnemonic = genMnemonic();
         String phase = "test";
-        HDKeyChain.ExtendedKey rootKey = HDKeyChain.genRootKey(toSeed(mnemonic, phase));
-        KeyPair keyPair = new KeyPair(rootKey.getExtendedPubKey(), (PrivateKey) rootKey.getKey());
+        HDKeyChain.ExtendedKey rootPrvKey = HDKeyChain.genRootKey(HDKeyChain.HDPrivateKeyID, toSeed(mnemonic, phase));
+        HDKeyChain.ExtendedKey rootPubKey = HDKeyChain.neuter(rootPrvKey);
+        KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(keyPair));
 
     }

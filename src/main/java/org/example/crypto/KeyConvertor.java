@@ -83,8 +83,7 @@ public class KeyConvertor {
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         BigInteger D = new BigInteger(binary, 2);
-        byte[] privateKeyS = D.toByteArray();
-        ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, privateKeyS), ecParameters);
+        ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(D, ecParameters);
         KeyFactory kf = KeyFactory.getInstance("EC");
         ECPrivateKey privateKey = (ECPrivateKey) kf.generatePrivate(privateSpec);
 
@@ -103,5 +102,65 @@ public class KeyConvertor {
         return recreateByPrvKey(new BigInteger(1, prvKey).toString(2));
     }
 
+    public static PrivateKey getPrvKey(BigInteger S) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
+        ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(S, ecParameters);
+        KeyFactory kf = KeyFactory.getInstance("EC");
+        return kf.generatePrivate(privateSpec);
+    }
+
+    public static PrivateKey getPrvKey(byte[] prvKeyBytes) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
+
+        ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, prvKeyBytes), ecParameters);
+        KeyFactory kf = KeyFactory.getInstance("EC");
+        return kf.generatePrivate(privateSpec);
+    }
+
+    public static byte[] getPubKeyBytesFromPrvKey(byte[] prvKey) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
+
+        BigInteger S = new BigInteger(1, prvKey);
+        ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(S, ecParameters);
+        KeyFactory kf = KeyFactory.getInstance("EC");
+        ECPrivateKey privateKey = (ECPrivateKey) kf.generatePrivate(privateSpec);
+
+        return getPubKeyBytesFromPrvKey(privateKey);
+    }
+
+    public static byte[] getPubKeyBytesFromPrvKey(ECPrivateKey privateKey) throws Exception {
+        ECPrivateKeyParameters prvParam = (ECPrivateKeyParameters) ECUtil.generatePrivateKeyParameter(privateKey);
+        ECMultiplier multiplier = new ECMultiplier();
+        org.bouncycastle.math.ec.ECPoint Q = multiplier.multiply(prvParam.getParameters().getG(), privateKey.getS()).normalize();
+        return Q.getEncoded(true);
+    }
+
+    public static PublicKey getPubKeyFromPrvKey(ECPrivateKey privateKey) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
+        KeyFactory kf = KeyFactory.getInstance("EC");
+
+        ECPrivateKeyParameters prvParam = (ECPrivateKeyParameters) ECUtil.generatePrivateKeyParameter(privateKey);
+        ECMultiplier multiplier = new ECMultiplier();
+        org.bouncycastle.math.ec.ECPoint Q = multiplier.multiply(prvParam.getParameters().getG(), privateKey.getS()).normalize();
+        ECPoint pubPoint = EC5Util.convertPoint(Q);
+        ECPublicKeySpec pubSpec = new ECPublicKeySpec(pubPoint, ecParameters);
+        return kf.generatePublic(pubSpec);
+    }
+
+    public static byte[] pubKey2Bytes(ECPublicKey publicKey) throws Exception {
+        AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+        parameters.init(new ECGenParameterSpec("secp256r1"));
+        ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
+        org.bouncycastle.math.ec.ECPoint bcPoint = EC5Util.convertPoint(ecParameters, publicKey.getW(), false);
+        return bcPoint.getEncoded(true);
+    }
 }
