@@ -1,1 +1,1 @@
-# fabricToC
+样例
