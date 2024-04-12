@@ -43,6 +43,15 @@ public class HDKeyChain {
 
         KeyPair childKeyPair = new KeyPair((PublicKey) childPubKey.getKey(), (PrivateKey) childPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(childKeyPair));
+
+        for (int i = 0; i < 20; i++) {
+            ExtendedKey grandChildPrvKey = derive(i, childPrvKey);
+            ExtendedKey grandChildPubKey = derive(i, childPubKey);
+            KeyPair grandChildKeyPair = new KeyPair((PublicKey) grandChildPubKey.getKey(), (PrivateKey) grandChildPrvKey.getKey());
+            System.out.println(i + ": " + KeyChecker.checkKeyPair(grandChildKeyPair));
+            childPrvKey = grandChildPrvKey;
+            childPubKey = grandChildPubKey;
+        }
     }
 
     public static ExtendedKey genRootKey(byte[] seed) throws Exception {
@@ -75,7 +84,7 @@ public class HDKeyChain {
             data = extendedKey.getKey().getEncoded();
         } else {
             if (extendedKey.isPrivate) {
-                if (null == extendedKey.getKey()) {
+                if (null == extendedKey.getExtendedPubKey()) {
                     PublicKey publicKey = KeyConvertor.genByPrvKey(((ECPrivateKey) extendedKey.getKey()).getS().toByteArray()).getPublic();
                     extendedKey.setExtendedPubKey(publicKey);
                 }
@@ -156,8 +165,9 @@ public class HDKeyChain {
         public ExtendedKey fillKeyBytes() throws Exception {
             if (isPrivate) {
                 this.keyBytes = new byte[33];
-                this.keyBytes[0] = (byte)0x00;
-                System.arraycopy(((ECPrivateKey) this.key).getS().toByteArray(), 0, this.keyBytes, 1, 32);
+                byte[] tmp = ((ECPrivateKey) this.key).getS().toByteArray();
+                int offset = this.keyBytes.length - tmp.length;
+                System.arraycopy(tmp, 0, this.keyBytes, offset, tmp.length);
             } else {
                 AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
                 parameters.init(new ECGenParameterSpec("secp256r1"));
