@@ -21,6 +21,9 @@ import java.util.Arrays;
 import java.util.Base64;
 
 public class KeyConvertor {
+    
+    public static final String CURVE_SECP256R1 = "secp256r1";
+    
     public static void main(String[] args) throws Exception {
         CryptoSuite cryptoSuite = CryptoSuiteFactory.getDefault().getCryptoSuite();
         KeyPair keyPair0 = cryptoSuite.keyGen();
@@ -71,7 +74,7 @@ public class KeyConvertor {
         byte[] publicKeyY = Base64.getDecoder().decode(encodedPublicKeyY);
         ECPoint pubPoint = new ECPoint(new BigInteger(1, publicKeyX), new BigInteger(1, publicKeyY));
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         ECPublicKeySpec pubSpec = new ECPublicKeySpec(pubPoint, ecParameters);
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, privateKeyS), ecParameters);
@@ -83,7 +86,7 @@ public class KeyConvertor {
 
     public static KeyPair recreateByPrvKey(String binary) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         BigInteger D = new BigInteger(binary, 2);
@@ -108,7 +111,7 @@ public class KeyConvertor {
 
     public static PrivateKey getPrvKey(BigInteger S) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(S, ecParameters);
@@ -118,7 +121,7 @@ public class KeyConvertor {
 
     public static PrivateKey getPrvKey(byte[] prvKeyBytes) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, prvKeyBytes), ecParameters);
@@ -146,7 +149,7 @@ public class KeyConvertor {
 
     private static PublicKey decompressY(byte[] x, boolean isOddY) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         KeyFactory kf = KeyFactory.getInstance("EC");
 
@@ -168,7 +171,7 @@ public class KeyConvertor {
 
     public static byte[] getPubKeyBytesFromPrvKey(byte[] prvKey) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         BigInteger S = new BigInteger(1, prvKey);
@@ -188,7 +191,7 @@ public class KeyConvertor {
 
     public static PublicKey getPubKeyFromPrvKey(ECPrivateKey privateKey) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         KeyFactory kf = KeyFactory.getInstance("EC");
 
@@ -202,7 +205,7 @@ public class KeyConvertor {
 
     public static byte[] pubKey2Bytes(ECPublicKey publicKey) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         org.bouncycastle.math.ec.ECPoint bcPoint = EC5Util.convertPoint(ecParameters, publicKey.getW(), false);
         return bcPoint.getEncoded(true);

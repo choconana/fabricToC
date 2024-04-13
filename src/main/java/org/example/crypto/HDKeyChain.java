@@ -25,6 +25,8 @@ import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
 import java.util.zip.CRC32;
 
+import static org.example.crypto.KeyConvertor.CURVE_SECP256R1;
+
 public class HDKeyChain {
 
     private static final byte[] masterKey = "HyperledgerFabic Seed".getBytes();
@@ -33,7 +35,20 @@ public class HDKeyChain {
 
     private static final int maxDepth = 255;
 
-    private static final int serializedKeyLen = 4 + 1 + 4 + 4 + 32 + 33;
+    private static final int versionLen = 4;
+
+    public static final int depthLen = 1;
+
+    public static final int parentFPLen = 4;
+
+    public static final int indexLen = 4;
+
+    public static final int chaincodeLen = 32;
+
+    public static final int keyLen = 33;
+
+    // 78字节
+    public static final int serializedKeyLen = versionLen + depthLen + parentFPLen + indexLen + chaincodeLen + keyLen;
 
     // BIP32 hierarchical deterministic extended key magics
     public static final byte[] HDPrivateKeyID = new BigInteger("0488ade4", 16).toByteArray(); // starts with xprv
@@ -129,13 +144,12 @@ public class HDKeyChain {
         byte[] chainCode = new byte[lr.length / 2];
         System.arraycopy(lr, 0, secretKey, 0, lr.length / 2);
         System.arraycopy(lr, lr.length / 2, chainCode, 0, lr.length / 2);
-        KeyPair keyPair = KeyConvertor.genByPrvKey(secretKey);
+        Key key = KeyConvertor.getPrvKey(secretKey);
 
 
         return ExtendedKey.builder()
                 .version(version)
-                .key(keyPair.getPrivate())
-                .extendedPubKey(keyPair.getPublic())
+                .key(key)
                 .chaincode(chainCode)
                 .parentFP(new byte[]{0x00 ,0x00, 0x00 ,0x00})
                 .depth(0)
@@ -174,7 +188,6 @@ public class HDKeyChain {
             throw new SecurityException("cannot derive a hardened key from a public key");
         }
 
-        int keyLen = 33;
         byte[] data = new byte[keyLen + 4];
         if (isChildHardened) {
             byte[] keyBytes = ((ECPrivateKey) extendedKey.getKey()).getS().toByteArray();
@@ -206,7 +219,7 @@ public class HDKeyChain {
             // 派生公钥
             ECPublicKey parentPubKey = (ECPublicKey) extendedKey.getKey();
             AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-            parameters.init(new ECGenParameterSpec("secp256r1"));
+            parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
             ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
             KeyFactory kf = KeyFactory.getInstance("EC");
 
@@ -294,7 +307,7 @@ public class HDKeyChain {
                 System.arraycopy(tmp, 0, this.keyBytes, offset, tmp.length);
             } else {
                 AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-                parameters.init(new ECGenParameterSpec("secp256r1"));
+                parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
                 ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
                 org.bouncycastle.math.ec.ECPoint bcPoint = EC5Util.convertPoint(ecParameters, ((ECPublicKey) this.key).getW(), false);
                 this.keyBytes = bcPoint.getEncoded(true);
@@ -305,12 +318,12 @@ public class HDKeyChain {
         public String serialize() {
             System.out.println(this);
             StringBuilder binary = new StringBuilder()
-                    .append(ByteUtils.toBinary(version, 32))
-                    .append(ByteUtils.formatBinary(Integer.toBinaryString(depth), 8))
-                    .append(ByteUtils.toBinary(parentFP, 32))
-                    .append(ByteUtils.formatBinary(Long.toBinaryString(childNum), 32))
-                    .append(ByteUtils.toBinary(chaincode, 256))
-                    .append(ByteUtils.toBinary(keyBytes, 264));
+                    .append(ByteUtils.toBinary(version, versionLen * 8))
+                    .append(ByteUtils.formatBinary(Integer.toBinaryString(depth), depthLen * 8))
+                    .append(ByteUtils.toBinary(parentFP, parentFPLen * 8))
+                    .append(ByteUtils.formatBinary(Long.toBinaryString(childNum), indexLen * 8))
+                    .append(ByteUtils.toBinary(chaincode, chaincodeLen * 8))
+                    .append(ByteUtils.toBinary(keyBytes, keyLen * 8));
             CRC32 crc32 = new CRC32();
             crc32.reset();
             crc32.update(new BigInteger(binary.toString(), 2).toByteArray());
@@ -334,39 +347,34 @@ public class HDKeyChain {
                 throw new InvalidKeyException("bad extended key checksum");
             }
 
-            int len = 0;
-            byte[] version = new byte[4];
-            System.arraycopy(decoded, len, version, 0, version.length);
-            len += version.length;
+            int cursor = 0;
+            byte[] version = new byte[versionLen];
+            System.arraycopy(decoded, cursor, version, 0, version.length);
+            cursor += version.length;
 
-            int depth = decoded[len] & 0xFF;
-            len++;
+            int depth = decoded[cursor] & 0xFF;
+            cursor++;
 
-            byte[] parentFP = new byte[4];
-            System.arraycopy(decoded, len, parentFP, 0, parentFP.length);
-            len += parentFP.length;
+            byte[] parentFP = new byte[parentFPLen];
+            System.arraycopy(decoded, cursor, parentFP, 0, parentFP.length);
+            cursor += parentFP.length;
 
-            byte[] childNumBytes = new byte[4];
-            System.arraycopy(decoded, len, childNumBytes, 0, childNumBytes.length);
+            byte[] childNumBytes = new byte[indexLen];
+            System.arraycopy(decoded, cursor, childNumBytes, 0, childNumBytes.length);
             long childNum = new BigInteger(1, childNumBytes).longValue();
-            len += childNumBytes.length;
+            cursor += childNumBytes.length;
 
-            byte[] chaincode = new byte[32];
-            System.arraycopy(decoded, len, chaincode, 0, chaincode.length);
-            len += chaincode.length;
+            byte[] chaincode = new byte[chaincodeLen];
+            System.arraycopy(decoded, cursor, chaincode, 0, chaincode.length);
+            cursor += chaincode.length;
 
-            byte[] keyBytes = new byte[33];
-            System.arraycopy(decoded, len, keyBytes, 0, keyBytes.length);
-            len += keyBytes.length;
+            byte[] keyBytes = new byte[keyLen];
+            System.arraycopy(decoded, cursor, keyBytes, 0, keyBytes.length);
+            cursor += keyBytes.length;
 
             boolean isPrivate = keyBytes[0] == 0x00;
 
-            Key key;
-            if (isPrivate) {
-                key = KeyConvertor.getPrvKey(keyBytes);
-            } else {
-                key = KeyConvertor.getPubKey(keyBytes);
-            }
+            Key key = isPrivate ? KeyConvertor.getPrvKey(keyBytes) : KeyConvertor.getPubKey(keyBytes);
 
             return ExtendedKey.builder()
                     .version(version)

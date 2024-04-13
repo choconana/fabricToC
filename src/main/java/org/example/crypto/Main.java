@@ -22,6 +22,8 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.*;
 import java.util.Base64;
 
+import static org.example.crypto.KeyConvertor.CURVE_SECP256R1;
+
 public class Main {
     public static void main(String[] args) throws Exception {
         CryptoSuite cryptoSuite = CryptoSuiteFactory.getDefault().getCryptoSuite();
@@ -73,7 +75,7 @@ public class Main {
         byte[] publicKeyY = Base64.getDecoder().decode(encodedPublicKeyY);
         ECPoint pubPoint = new ECPoint(new BigInteger(1, publicKeyX), new BigInteger(1, publicKeyY));
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         ECPublicKeySpec pubSpec = new ECPublicKeySpec(pubPoint, ecParameters);
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, privateKeyS), ecParameters);
@@ -85,7 +87,7 @@ public class Main {
 
     public static KeyPair recreateByPrvKey(String binary) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec("secp256r1"));
+        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         BigInteger D = new BigInteger(binary, 2);
