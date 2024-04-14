@@ -22,14 +22,12 @@ import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
-import java.util.Arrays;
-import java.util.zip.CRC32;
 
 import static org.example.crypto.KeyConvertor.CURVE_SECP256R1;
 
 public class HDKeyChain {
 
-    private static final byte[] masterKey = "HyperledgerFabic Seed".getBytes();
+    private static final byte[] masterKey = "Bitcoin seed".getBytes();
 
     private static final long hardenedKeyStart = 0x80000000L;
 
@@ -51,19 +49,38 @@ public class HDKeyChain {
     public static final int serializedKeyLen = versionLen + depthLen + parentFPLen + indexLen + chaincodeLen + keyLen;
 
     // BIP32 hierarchical deterministic extended key magics
-    public static final byte[] HDPrivateKeyID = new BigInteger("0488ade4", 16).toByteArray(); // starts with xprv
-    public static final byte[] HDPublicKeyID = new BigInteger("0488b21e", 16).toByteArray(); // starts with xpub
+    // starts with xprv
+    public static final byte[] HDPrivateKeyID_BIP44 = new BigInteger("0488ade4", 16).toByteArray();
+    // starts with xpub
+    public static final byte[] HDPublicKeyID_BIP44 = new BigInteger("0488b21e", 16).toByteArray();
+    // starts with yprv
+    public static final byte[] HDPrivateKeyID_BIP49 = new BigInteger("049d7878", 16).toByteArray();
+    // starts with ypub
+    public static final byte[] HDPublicKeyID_BIP49 = new BigInteger("049d7cb2", 16).toByteArray();
+    // starts with zprv
+    public static final byte[] HDPrivateKeyID_BIP84 = new BigInteger("04b2430c", 16).toByteArray();
+    // starts with zpub
+    public static final byte[] HDPublicKeyID_BIP84 = new BigInteger("04b24746", 16).toByteArray();
+
+
+
+    // P2PKH地址
+    // start with 1
+    public static final byte pubKeyHashAddrID_Main = 0x00;
+    // start with m or n
+    public static final byte pubKeyHashAddrID_Test = 0x6f;
 
     public static void main(String[] args) throws Exception {
 //        testDerive();
         testSerialize();
+//        testAddress();
     }
 
     public static void testDerive() throws Exception {
         byte[] seed = new byte[32];
         SecureRandom random = JCAUtil.getSecureRandom();
         random.nextBytes(seed);
-        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID, seed);
+        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID_BIP44, seed);
         ExtendedKey rootPubKey = neuter(rootPrvKey);
         KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(keyPair));
@@ -98,7 +115,7 @@ public class HDKeyChain {
         byte[] seed = new byte[32];
         SecureRandom random = JCAUtil.getSecureRandom();
         random.nextBytes(seed);
-        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID, seed);
+        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID_BIP44, seed);
         ExtendedKey rootPubKey = neuter(rootPrvKey);
         KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
         System.out.println(KeyChecker.checkKeyPair(keyPair));
@@ -133,6 +150,21 @@ public class HDKeyChain {
         }
     }
 
+    public static void testAddress() throws Exception {
+        byte[] seed = new byte[32];
+        SecureRandom random = JCAUtil.getSecureRandom();
+        random.nextBytes(seed);
+        ExtendedKey rootPrvKey = genRootKey(HDPrivateKeyID_BIP44, seed);
+        ExtendedKey rootPubKey = neuter(rootPrvKey);
+        KeyPair keyPair = new KeyPair((PublicKey) rootPubKey.getKey(), (PrivateKey) rootPrvKey.getKey());
+        System.out.println(KeyChecker.checkKeyPair(keyPair));
+
+        String address = rootPrvKey.addressP2PKH(pubKeyHashAddrID_Test);
+        System.out.println(address);
+
+    }
+
+    // prv c71efa572353f279513d89a4c8ed19e6eb725825a85e9833d8e4e220ca949391
     public static ExtendedKey genRootKey(byte[] version, byte[] seed) throws Exception {
         if (seed.length < 16 || seed.length > 64) {
             throw new InvalidParameterException("seed bytes length should between 16 and 64");
@@ -166,7 +198,7 @@ public class HDKeyChain {
         }
 
         return ExtendedKey.builder()
-                .version(HDPublicKeyID)
+                .version(HDPublicKeyID_BIP44)
                 .key(KeyConvertor.getPubKeyFromPrvKey((ECPrivateKey) extendedKey.getKey()))
                 .chaincode(extendedKey.getChaincode())
                 .parentFP(extendedKey.getParentFP())
@@ -252,11 +284,10 @@ public class HDKeyChain {
     public static byte[] getPubKeyBytes(ExtendedKey extendedKey) throws Exception {
         byte[] data;
         if (extendedKey.isPrivate) {
-            if (null == extendedKey.getExtendedPubKey()) {
-                PublicKey publicKey = KeyConvertor.genByPrvKey(((ECPrivateKey) extendedKey.getKey()).getS().toByteArray()).getPublic();
-                extendedKey.setExtendedPubKey(publicKey);
+            if (null == extendedKey.getPubKey() || extendedKey.getPubKey().length == 0) {
+                extendedKey.setPubKey(KeyConvertor.getPubKeyBytesFromPrvKey((ECPrivateKey) extendedKey.getKey()));
             }
-            data = KeyConvertor.pubKey2Bytes((ECPublicKey) extendedKey.getExtendedPubKey());
+            data = extendedKey.getPubKey();
         } else {
             data = KeyConvertor.pubKey2Bytes((ECPublicKey) extendedKey.getKey());
         }
@@ -278,8 +309,12 @@ public class HDKeyChain {
         private Key key;
 
         // This will only be set for extended priv keys
+//        @ToString.Exclude
+//        private PublicKey extendedPubKey;
+
+        // This will only be set for extended priv keys
         @ToString.Exclude
-        private PublicKey extendedPubKey;
+        private byte[] pubKey;
 
         // 33字节
         @ToString.Exclude
@@ -317,34 +352,20 @@ public class HDKeyChain {
 
         public String serialize() {
             System.out.println(this);
-            StringBuilder binary = new StringBuilder()
-                    .append(ByteUtils.toBinary(version, versionLen * 8))
-                    .append(ByteUtils.formatBinary(Integer.toBinaryString(depth), depthLen * 8))
-                    .append(ByteUtils.toBinary(parentFP, parentFPLen * 8))
-                    .append(ByteUtils.formatBinary(Long.toBinaryString(childNum), indexLen * 8))
-                    .append(ByteUtils.toBinary(chaincode, chaincodeLen * 8))
-                    .append(ByteUtils.toBinary(keyBytes, keyLen * 8));
-            CRC32 crc32 = new CRC32();
-            crc32.reset();
-            crc32.update(new BigInteger(binary.toString(), 2).toByteArray());
-            binary.append(ByteUtils.formatBinary(Long.toBinaryString(crc32.getValue()), 32));
-            return Base58.encode(new BigInteger(binary.toString(), 2).toByteArray());
+            String binary = ByteUtils.toBinary(version, versionLen * 8) +
+                    ByteUtils.formatBinary(Integer.toBinaryString(depth), depthLen * 8) +
+                    ByteUtils.toBinary(parentFP, parentFPLen * 8) +
+                    ByteUtils.formatBinary(Long.toBinaryString(childNum), indexLen * 8) +
+                    ByteUtils.toBinary(chaincode, chaincodeLen * 8) +
+                    ByteUtils.toBinary(keyBytes, keyLen * 8);
+            return Base58.encodeChecked(null, new BigInteger(binary, 2).toByteArray());
         }
 
         public static ExtendedKey deserialize(String base58Key) throws Exception {
 
-            byte[] decoded = Base58.decode(base58Key);
-            if (decoded.length != serializedKeyLen + 4) {
+            byte[] decoded = Base58.decodeChecked(base58Key);
+            if (decoded.length != serializedKeyLen) {
                 throw new InvalidKeyException("the provided serialized extended key length is invalid");
-            }
-
-            byte[] payload = Arrays.copyOfRange(decoded, 0, decoded.length - 4);
-            byte[] checksum = Arrays.copyOfRange(decoded, decoded.length - 4, decoded.length);
-            CRC32 crc32 = new CRC32();
-            crc32.reset();
-            crc32.update(payload);
-            if (crc32.getValue() != new BigInteger(1, checksum).longValue()) {
-                throw new InvalidKeyException("bad extended key checksum");
             }
 
             int cursor = 0;
@@ -387,7 +408,18 @@ public class HDKeyChain {
                     .isPrivate(isPrivate)
                     .build();
         }
+
+        public String addressP2PKH(byte netID) throws Exception {
+            if (null == this.pubKey || this.pubKey.length == 0) {
+                getPubKeyBytes(this);
+            }
+            byte[] raw = new byte[21];
+            raw[0] = netID;
+            System.arraycopy(hash160(this.pubKey), 0, raw, 1, 20);
+            return Base58.encodeChecked(null, raw);
+        }
     }
+
 
     public String getDerivationPath() {
         return "";
