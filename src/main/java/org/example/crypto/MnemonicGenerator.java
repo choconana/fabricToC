@@ -21,9 +21,9 @@ public class MnemonicGenerator {
     private final static HashMap<String, String> wordsIndex = new HashMap<>();
 
     static {
-        String resourcePath = MnemonicGenerator.class.getClassLoader().getResource("").getPath();
-        String filePath = resourcePath + "static/bip-0032/chinese_simplified.txt";
         try {
+            String resourcePath = MnemonicGenerator.class.getClassLoader().getResource("").getPath();
+            String filePath = resourcePath + "static/bip-0032/chinese_simplified.txt";
             FileInputStream fin = new FileInputStream(filePath);
             InputStreamReader reader = new InputStreamReader(fin);
             BufferedReader buffReader = new BufferedReader(reader);
@@ -63,7 +63,7 @@ public class MnemonicGenerator {
         byte[] seed = random(16);
         MD5.create().digest(seed);
         String seedStr = StringUtils.leftPad(new BigInteger(1, MD5.create().digest(seed)).toString(2), 128, '0');
-        String pad = StringUtils.leftPad(BigInteger.valueOf(crc4_itu(seed, 0, seed.length)).toString(2), 4, '0');
+        String pad = StringUtils.leftPad(BigInteger.valueOf(crc4ITU(seed, 0, seed.length)).toString(2), 4, '0');
         return genMnemonic(seedStr + pad, 12);
     }
 
@@ -72,7 +72,7 @@ public class MnemonicGenerator {
         byte[] seed = random(32);
         SHA256.Digest sha256 = new SHA256.Digest();
         String seedStr = StringUtils.leftPad(new BigInteger(1, sha256.digest(seed)).toString(2), 256, '0');
-        String pad = StringUtils.leftPad(BigInteger.valueOf(crc4_itu(seed, 0, seed.length)).toString(2), 8, '0');
+        String pad = StringUtils.leftPad(BigInteger.valueOf(crc4ITU(seed, 0, seed.length)).toString(2), 8, '0');
         return genMnemonic(seedStr + pad, 24);
     }
 
@@ -103,15 +103,14 @@ public class MnemonicGenerator {
         return new BigInteger(binary.toString(), 2).toByteArray();
     }
 
-    public static byte crc4_itu(byte[] data, int offset,int length){
-        byte i;
-        byte crc = 0;                // Initial value
+    public static byte crc4ITU(byte[] data, int offset,int length){
+        byte crc = 0;
         length += offset;
-        for(int j=offset;j<length;j++) {
+        for(int j = offset; j < length; j++) {
             crc ^= data[j];
-            for (i = 0; i < 8; ++i){
+            for (int i = 0; i < 8; ++i){
                 if ((crc & 1) != 0x00)
-                    crc = (byte) (((crc & 0xff) >> 1 ) ^ 0x0C);// 0x0C = (reverse 0x03)>>(8-4)
+                    crc = (byte) (((crc & 0xff) >> 1 ) ^ 0x0C);
                 else
                     crc = (byte) ((crc & 0xff) >> 1);
             }
@@ -122,7 +121,7 @@ public class MnemonicGenerator {
     public static void testCrc4() throws NoSuchAlgorithmException {
         byte[] seed = random(1);
         String seedStr = new BigInteger(1, seed).toString(2);
-        String pad = String.format("%4s", BigInteger.valueOf(crc4_itu(seed, 0, seed.length)).toString(2)).replace(' ', '0');
+        String pad = String.format("%4s", BigInteger.valueOf(crc4ITU(seed, 0, seed.length)).toString(2)).replace(' ', '0');
         System.out.println(seedStr+pad);
     }
 
