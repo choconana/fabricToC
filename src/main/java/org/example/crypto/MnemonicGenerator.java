@@ -42,6 +42,7 @@ public class MnemonicGenerator {
 
     }
 
+    // todo 如果更换手机号、银行卡号怎么处理, 加入派生路径：最基本的二要素作为根密钥的必要信息，根据其他要素派生密钥？
     public static byte[] genSeed(BaseInfo baseInfo, int size) throws NoSuchAlgorithmException {
         if (null == baseInfo) {
             return random(size);
@@ -137,7 +138,9 @@ public class MnemonicGenerator {
 
     public static void main(String[] args) throws Exception {
         BaseInfo baseInfo = BaseInfo.builder()
-                .identification("420984199512240039")
+                .authFactor(3)
+                .name("Oo")
+                .idNo("420984199512240039")
                 .phone("18163349535")
                 .build();
         String[] mnemonic = genMnemonic12(baseInfo);
@@ -153,12 +156,38 @@ public class MnemonicGenerator {
     @Builder
     static class BaseInfo {
 
-        private String identification;
+        // 认证要素
+        private Integer authFactor;
+
+        private String idNo;
+
+        private String name;
 
         private String phone;
 
+        private String bankCard;
+
         public String serialize() {
-            return identification + ":" + phone;
+            if (StringUtils.isBlank(idNo) || StringUtils.isBlank(name)) {
+                throw new IllegalArgumentException("idNo and name should not be null");
+            }
+            String str = authFactor + ":" + idNo + ":" + name;
+            switch (authFactor) {
+                case 2:
+                    return str;
+                case 3:
+                    if (StringUtils.isBlank(phone)) {
+                        throw new IllegalArgumentException("phone should not be null");
+                    }
+                    return str + ":" + phone;
+                case 4:
+                    if (StringUtils.isBlank(phone) || StringUtils.isBlank(bankCard)) {
+                        throw new IllegalArgumentException("phone and bankCard should not be null");
+                    }
+                    return str + ":" + phone + ":" + bankCard;
+                default:
+                    throw new IllegalArgumentException("invalid authFactor");
+            }
         }
     }
 }
