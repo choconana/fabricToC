@@ -164,7 +164,6 @@ public class HDKeyChain {
 
     }
 
-    // prv c71efa572353f279513d89a4c8ed19e6eb725825a85e9833d8e4e220ca949391
     public static ExtendedKey genRootKey(byte[] version, byte[] seed) throws Exception {
         if (seed.length < 16 || seed.length > 64) {
             throw new InvalidParameterException("seed bytes length should between 16 and 64");
@@ -329,7 +328,7 @@ public class HDKeyChain {
 
         private long childNum;
 
-        @ToString.Exclude 
+        @ToString.Exclude
         private byte[] version;
 
         private boolean isPrivate;

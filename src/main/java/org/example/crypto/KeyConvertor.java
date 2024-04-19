@@ -6,7 +6,10 @@ import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
 import org.bouncycastle.jcajce.provider.asymmetric.util.EC5Util;
 import org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil;
+import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
+import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve;
+import org.bouncycastle.math.ec.custom.sec.SecP256K1Point;
 import org.bouncycastle.math.ec.custom.sec.SecP256R1Curve;
 import org.bouncycastle.math.ec.custom.sec.SecP256R1Point;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
@@ -21,9 +24,10 @@ import java.util.Arrays;
 import java.util.Base64;
 
 public class KeyConvertor {
-    
+
     public static final String CURVE_SECP256R1 = "secp256r1";
-    
+    public static final String CURVE_SECP256K1 = "secp256k1";
+
     public static void main(String[] args) throws Exception {
         CryptoSuite cryptoSuite = CryptoSuiteFactory.getDefault().getCryptoSuite();
         KeyPair keyPair0 = cryptoSuite.keyGen();
@@ -110,8 +114,12 @@ public class KeyConvertor {
     }
 
     public static PrivateKey getPrvKey(BigInteger S) throws Exception {
+        return getPrvKey(S, CURVE_SECP256R1);
+    }
+
+    public static PrivateKey getPrvKey(BigInteger S, String curveName) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
+        parameters.init(new ECGenParameterSpec(curveName));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(S, ecParameters);
@@ -120,8 +128,12 @@ public class KeyConvertor {
     }
 
     public static PrivateKey getPrvKey(byte[] prvKeyBytes) throws Exception {
+        return getPrvKey(prvKeyBytes, CURVE_SECP256R1);
+    }
+
+    public static PrivateKey getPrvKey(byte[] prvKeyBytes, String curveName) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
+        parameters.init(new ECGenParameterSpec(curveName));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
 
         ECPrivateKeySpec privateSpec = new ECPrivateKeySpec(new BigInteger(1, prvKeyBytes), ecParameters);
@@ -130,6 +142,10 @@ public class KeyConvertor {
     }
 
     public static PublicKey getPubKey(byte[] pubKeyBytes) throws Exception {
+        return getPubKey(pubKeyBytes, CURVE_SECP256R1);
+    }
+
+    public static PublicKey getPubKey(byte[] pubKeyBytes, String curveName) throws Exception {
 
         PublicKey publicKey = null;
 
@@ -142,24 +158,44 @@ public class KeyConvertor {
                 byte format = pubKeyBytes[0];
                 byte[] x = Arrays.copyOfRange(pubKeyBytes, 1, pubKeyBytes.length);
                 boolean isOddY = format == 0x03;
-                publicKey = decompressY(x, isOddY);
+                publicKey = decompressY(x, isOddY, curveName);
         }
         return publicKey;
     }
 
-    private static PublicKey decompressY(byte[] x, boolean isOddY) throws Exception {
+    public static PublicKey decompressY(byte[] x, boolean isOddY) throws Exception {
+        return decompressY(x, isOddY, CURVE_SECP256R1);
+    }
+
+    public static PublicKey decompressY(byte[] x, boolean isOddY, String curveName) throws Exception {
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        parameters.init(new ECGenParameterSpec(CURVE_SECP256R1));
+        parameters.init(new ECGenParameterSpec(curveName));
         ECParameterSpec ecParameters = parameters.getParameterSpec(ECParameterSpec.class);
         KeyFactory kf = KeyFactory.getInstance("EC");
 
         // y^2 = x^3 + ax + b => y = +-sqrt(x^3 + ax + b)
-        SecP256R1Curve curve = new SecP256R1Curve();
+        ECCurve curve;
+        switch (curveName) {
+            case CURVE_SECP256K1:
+                curve = new SecP256K1Curve();
+                break;
+            case CURVE_SECP256R1:
+            default:
+                curve = new SecP256R1Curve();
+        }
         ECFieldElement A = curve.getA();
         ECFieldElement B = curve.getB();
         ECFieldElement X = curve.fromBigInteger(new BigInteger(1, x));
         ECFieldElement Y = X.square().multiply(X).add(A.multiply(X)).add(B).sqrt();
-        org.bouncycastle.math.ec.ECPoint P = new SecP256R1Point(curve, X, Y);
+        org.bouncycastle.math.ec.ECPoint P;
+        switch (curveName) {
+            case CURVE_SECP256K1:
+                P =new SecP256K1Point(curve, X, Y);
+                break;
+            case CURVE_SECP256R1:
+            default:
+                P = new SecP256R1Point(curve, X, Y);
+        }
         P.normalize();
         if (P.getAffineYCoord().testBitZero() != isOddY) {
             P = P.negate();

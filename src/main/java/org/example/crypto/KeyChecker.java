@@ -15,7 +15,7 @@ import java.security.spec.ECPublicKeySpec;
 public class KeyChecker {
 
     public static boolean checkKeyPair(KeyPair keyPair) {
-        String raw = "external key check";
+        String raw = "coco";
         try {
             return encryptAndDecrypt(raw, keyPair) && signAndVerify(raw, keyPair);
         } catch (Exception e) {
@@ -78,10 +78,10 @@ public class KeyChecker {
         return new String(cipher.doFinal(inputByte));
     }
 
-    public static String sign(String src, PrivateKey priKey) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+    public static String sign(String src, PrivateKey prvKey) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         Signature signature = Signature.getInstance("SHA256withECDSA");
         byte[] srcData = src.getBytes();
-        signature.initSign(priKey);
+        signature.initSign(prvKey);
         signature.update(srcData);
         byte[] signBytes = signature.sign();
         return new BigInteger(1, signBytes).toString(16);
