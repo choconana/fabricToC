@@ -8,8 +8,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/wallet")
 public class WalletController {
 
+    @PostMapping("/createWallet")
+    public String createWallet(String password, String phase) {
+        return "mnemonic";
+    }
+
     @PostMapping("/importWordlist")
     public String importWordlist(String wordlist) {
         return "";
     }
+
 }
