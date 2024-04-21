@@ -2,3 +2,4 @@
 2. 理清组织与应用、用户的关系
 3. 设计数据存储方案
 4. 对于erc20交易，怎么查询交易记录
+5. 配置动态化，如：动态配置私有数据集的policy(key-level endorsement policy)
