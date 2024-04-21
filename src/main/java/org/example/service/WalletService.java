@@ -7,6 +7,8 @@ import java.security.KeyPair;
 
 public interface WalletService {
 
+    Identity createAdmin() throws Exception;
+
     User getWalletAdmin() throws Exception;
 
     Identity register(String address, KeyPair proxyKey) throws Exception;

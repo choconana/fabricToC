@@ -410,7 +410,7 @@ public class HDKeyChain {
 
         public String addressP2PKH(byte netID) throws Exception {
             if (null == this.pubKey || this.pubKey.length == 0) {
-                getPubKeyBytes(this);
+                this.pubKey = getPubKeyBytes(this);
             }
             byte[] raw = new byte[21];
             raw[0] = netID;

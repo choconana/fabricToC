@@ -3,9 +3,7 @@ package org.example.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.service.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
@@ -17,7 +15,7 @@ public class WalletController {
     private final WalletService walletService;
 
     @PostMapping("/connect")
-    public String connect(Map<String, String> params) {
+    public String connect(@RequestBody Map<String, String> params) {
         String pubkey = params.get("pub");
         String signature = params.get("sig");
         try {
