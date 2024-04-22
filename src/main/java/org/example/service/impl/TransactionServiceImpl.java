@@ -1,5 +1,6 @@
 package org.example.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Slf4j
@@ -53,6 +55,19 @@ public class TransactionServiceImpl implements TransactionService {
                     final int txCount = transactionEnvelopeInfo.getTransactionActionInfoCount();
                     final boolean isValid = transactionEnvelopeInfo.isValid();
                     final int validationCode = transactionEnvelopeInfo.getValidationCode();
+                    final Date txTime = transactionEnvelopeInfo.getTimestamp();
+                    final String creator = transactionEnvelopeInfo.getCreator().getId();
+                    final String txid = transactionEnvelopeInfo.getTransactionID();
+
+
+                    JSONObject rwJson = new JSONObject();
+                    rwJson.put("index", i);
+                    rwJson.put("txCount", txCount);
+                    rwJson.put("time", DateUtil.format(txTime, "yyyy-MM-dd HH:mm:ss"));
+                    rwJson.put("isValid", isValid);
+                    rwJson.put("validationCode", validationCode);
+                    rwJson.put("creator", creator);
+                    rwJson.put("txid", txid);
 
                     for (BlockInfo.TransactionEnvelopeInfo.TransactionActionInfo transactionActionInfo : transactionEnvelopeInfo.getTransactionActionInfos()) {
                         final int endorsementsCount = transactionActionInfo.getEndorsementsCount();
@@ -76,8 +91,6 @@ public class TransactionServiceImpl implements TransactionService {
                         if (null != rwsetInfo) {
                             int rwsetCount = rwsetInfo.getNsRwsetCount();
 
-                            JSONObject rwJson = new JSONObject();
-                            rwJson.put("index", i);
                             JSONArray rwArray = new JSONArray();
                             for (TxReadWriteSetInfo.NsRwsetInfo nsRwsetInfo : rwsetInfo.getNsRwsetInfos()) {
                                 final String namespace = nsRwsetInfo.getNamespace();
@@ -101,8 +114,8 @@ public class TransactionServiceImpl implements TransactionService {
                                 tmp.put("writeSet", wJson);
                                 rwArray.add(tmp);
                             }
-
-                            rwJsonArray.add(rwArray);
+                            rwJson.put("txInfo", rwArray);
+                            rwJsonArray.add(rwJson);
                         }
                     }
                 }

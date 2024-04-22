@@ -84,9 +84,6 @@ public class TokenErc20ServiceImpl implements TokenErc20Service {
         Network network = gateway.getNetwork(Connection.CHANNEL);
         Contract contract = network.getContract(CONTRACT);
 
-        BlockchainInfo blockchainInfo = network.getChannel().queryBlockchainInfo();
-        BlockInfo blockInfo = network.getChannel().queryBlockByNumber(23);
-        blockInfo.getBlock().getData();
 
         byte[] total = contract.evaluateTransaction("TotalSupply");
 
