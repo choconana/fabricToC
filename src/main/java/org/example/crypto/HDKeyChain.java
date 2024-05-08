@@ -72,8 +72,8 @@ public class HDKeyChain {
 
     public static void main(String[] args) throws Exception {
 //        testDerive();
-        testSerialize();
-//        testAddress();
+//        testSerialize();
+        testAddress();
     }
 
     public static void testDerive() throws Exception {
